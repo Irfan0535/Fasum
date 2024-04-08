@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "410302709481",
+    "firebase_url": "https://fire-base-autentifikasi-default-rtdb.firebaseio.com",
+    "project_id": "fire-base-autentifikasi",
+    "storage_bucket": "fire-base-autentifikasi.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:410302709481:android:4c78f807be5640f83cba78",
+        "android_client_info": {
+          "package_name": "com.example.fasum"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCyLgdlViJMAuq-32pnIsswTNB1AeaYZ_Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

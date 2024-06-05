@@ -1,11 +1,13 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:fasum/screens/location.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:fasum/screens/location.dart'; // Import LocationWidget
 
 class AddPostScreen extends StatefulWidget {
   @override
@@ -13,39 +15,54 @@ class AddPostScreen extends StatefulWidget {
 }
 
 class _AddPostScreenState extends State<AddPostScreen> {
-  File? _image;
+  XFile? _image;
+  Uint8List? _webImage;
   final picker = ImagePicker();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _placeNameController = TextEditingController();
   Position? _currentPosition;
+
+  bool _isLocationEnabled =
+      false; // Add a flag to track if location is obtained
+
+  // Function to update current position
+  void _updateLocation(Position? position) {
+    setState(() {
+      _currentPosition = position;
+      _isLocationEnabled = true; // Update flag when location is obtained
+    });
+  }
+
+  // Function to validate if all required fields are filled
+  bool _validateFields() {
+    return _image != null &&
+        _descriptionController.text.isNotEmpty &&
+        _isLocationEnabled; // Ensure location is enabled
+  }
 
   Future getImage() async {
     final pickedFile = await picker.pickImage(source: ImageSource.camera);
 
     setState(() {
       if (pickedFile != null) {
-        _image = File(pickedFile.path);
+        _image = pickedFile;
+        if (kIsWeb) {
+          pickedFile.readAsBytes().then((value) {
+            setState(() {
+              _webImage = value;
+            });
+          });
+        }
       } else {
         print('No image selected.');
       }
     });
   }
 
-  void _updateLocation(Position position) {
-    setState(() {
-      _currentPosition = position;
-    });
-  }
-
   Future<void> _uploadPost() async {
-    if (_image == null ||
-        _descriptionController.text.isEmpty ||
-        _placeNameController.text.isEmpty ||
-        _currentPosition == null) {
+    if (!_validateFields()) {
+      // Check if all required fields are filled
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(
-                'Image, description, place name, and location are required')),
+        SnackBar(content: Text('Please fill all required fields')),
       );
       return;
     }
@@ -56,7 +73,15 @@ class _AddPostScreenState extends State<AddPostScreen> {
           .ref()
           .child('post_images')
           .child('${DateTime.now()}.jpg');
-      await ref.putFile(_image!);
+
+      if (kIsWeb) {
+        final metadata = SettableMetadata(contentType: 'image/jpeg');
+        await ref.putData(_webImage!, metadata);
+      } else {
+        final file = File(_image!.path);
+        await ref.putFile(file);
+      }
+
       imageUrl = await ref.getDownloadURL();
     } catch (e) {
       print(e);
@@ -69,11 +94,11 @@ class _AddPostScreenState extends State<AddPostScreen> {
     FirebaseFirestore.instance.collection('posts').add({
       'imageUrl': imageUrl,
       'description': _descriptionController.text,
-      'placeName': _placeNameController.text,
-      'location':
-          GeoPoint(_currentPosition!.latitude, _currentPosition!.longitude),
       'timestamp': Timestamp.now(),
       'username': username,
+      if (_currentPosition != null)
+        'location':
+            GeoPoint(_currentPosition!.latitude, _currentPosition!.longitude),
     });
 
     Navigator.pop(context);
@@ -94,18 +119,17 @@ class _AddPostScreenState extends State<AddPostScreen> {
                 onTap: getImage,
                 child: _image == null
                     ? Icon(Icons.camera_alt, size: 100)
-                    : Image.file(_image!),
-              ),
-              TextField(
-                controller: _placeNameController,
-                decoration: InputDecoration(labelText: 'Place Name'),
+                    : kIsWeb
+                        ? Image.memory(_webImage!)
+                        : Image.file(File(_image!.path)),
               ),
               TextField(
                 controller: _descriptionController,
                 decoration: InputDecoration(labelText: 'Description'),
               ),
               SizedBox(height: 20),
-              LocationWidget(onLocationChanged: _updateLocation),
+              LocationWidget(
+                  onLocationChanged: _updateLocation), // Add LocationWidget
               SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _uploadPost,

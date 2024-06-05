@@ -1,11 +1,11 @@
 import 'package:fasum/screens/add_post_screen.dart';
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fasum/screens/sign_in_screen.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -23,24 +23,30 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Home Screen'),
+        title: const Text('Home Screen'),
         actions: [
           IconButton(
-            onPressed: () {
-              signOut(context);
-            },
-            icon: const Icon(Icons.logout),
+            icon: Icon(Icons.logout),
+            onPressed: () => signOut(context),
           ),
         ],
       ),
       body: StreamBuilder(
         stream: FirebaseFirestore.instance.collection('posts').snapshots(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
+          } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(child: Text('No posts available'));
           }
-          return ListView(
-            children: snapshot.data!.docs.map((document) {
+          return ListView.builder(
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              final document = snapshot.data!.docs[index];
+              final location = document.get('location') as GeoPoint?;
+              final defaultLocation = GeoPoint(
+                  0.0, 0.0); // Nilai default lokasi jika tidak tersedia
+
               return Card(
                 child: ListTile(
                   leading: document['imageUrl'] != null
@@ -52,11 +58,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text(document['timestamp'].toDate().toString()),
                       Text(document['description']),
+                      Text(
+                        'Location: ${location?.latitude ?? defaultLocation.latitude}, ${location?.longitude ?? defaultLocation.longitude}',
+                      ),
                     ],
                   ),
                 ),
               );
-            }).toList(),
+            },
           );
         },
       ),
